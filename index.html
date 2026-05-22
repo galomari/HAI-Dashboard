@@ -132,14 +132,15 @@
       document.getElementById('stat-delivered').textContent = delivered;
       document.getElementById('stat-delivered-delta').innerHTML = deltaHtml(delivered - prevDelivered);
 
-      const colors = STAGES.map(s => s === "Delivered" ? "#34d399" : s === "Attempt" ? "#f87171" : "#6366f1");
+      const activeStages = STAGES.filter(s => (current[s] || 0) > 0);
+      const colors = activeStages.map(s => s === "Delivered" ? "#34d399" : s === "Attempt" ? "#f87171" : "#6366f1");
 
       new Chart(document.getElementById('chart'), {
         type: 'bar',
         data: {
-          labels: STAGES,
+          labels: activeStages,
           datasets: [{
-            data: STAGES.map(s => current[s] || 0),
+            data: activeStages.map(s => current[s] || 0),
             backgroundColor: colors,
             borderRadius: 4,
             borderSkipped: false,
@@ -159,13 +160,15 @@
 
       const tbody = document.getElementById('tbody');
       let runTotal = 0;
-      STAGES.forEach((stage, i) => {
+      let visibleIndex = 1;
+      STAGES.forEach((stage) => {
         const count = current[stage] || 0;
-        const delta = count - (prev[stage] || 0);
         runTotal += count;
+        if (count === 0) return;
+        const delta = count - (prev[stage] || 0);
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td style="color:#475569">${i + 1}</td>
+          <td style="color:#475569">${visibleIndex++}</td>
           <td>${stage}</td>
           <td class="num">${count}</td>
           <td class="num">${deltaHtml(delta)}</td>`;
