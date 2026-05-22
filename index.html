@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HAI Task Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f1117; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; padding: 2rem; }
+    header { margin-bottom: 2rem; }
+    h1 { font-size: 1.6rem; font-weight: 700; }
+    .subtitle { color: #64748b; font-size: 0.85rem; margin-top: 0.25rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 12px; padding: 1.5rem; }
+    .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 1.25rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { text-align: left; color: #475569; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.75rem 0.6rem; border-bottom: 1px solid #2d3748; }
+    td { padding: 0.55rem 0.75rem; border-bottom: 1px solid #1e2433; }
+    tr:last-child td { border-bottom: none; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .delta-up { color: #34d399; font-weight: 600; }
+    .delta-down { color: #f87171; font-weight: 600; }
+    .delta-flat { color: #334155; }
+    .row-total td { border-top: 1px solid #2d3748; border-bottom: none; font-weight: 700; color: #94a3b8; padding-top: 0.75rem; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 1rem 1.25rem; }
+    .stat-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; margin-top: 0.2rem; }
+    .stat-delta { font-size: 0.8rem; margin-top: 0.15rem; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>HAI Task Dashboard</h1>
+    <p class="subtitle" id="updated">Loading...</p>
+  </header>
+
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="stat-label">Total Tasks</div>
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-delta" id="stat-total-delta"></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">In Progress</div>
+      <div class="stat-value" id="stat-active">—</div>
+      <div class="stat-delta" id="stat-active-delta"></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Delivered</div>
+      <div class="stat-value" id="stat-delivered">—</div>
+      <div class="stat-delta" id="stat-delivered-delta"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Tasks by Stage</h2>
+      <canvas id="chart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Stage Breakdown</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Stage</th>
+            <th class="num">Count</th>
+            <th class="num">Change</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const STAGES = [
+      "Attempt", "Eval Stage 1", "Review 1", "BPO Holding",
+      "Pending Pass@", "Submitted for Pass@", "CL AYDEN", "Pass@0",
+      "Internal Audit", "Ready to Deliver", "Delivered"
+    ];
+
+    const IN_PROGRESS_STAGES = new Set([
+      "Attempt", "Eval Stage 1", "Review 1", "BPO Holding",
+      "Pending Pass@", "Submitted for Pass@", "CL AYDEN", "Pass@0",
+      "Internal Audit", "Ready to Deliver"
+    ]);
+
+    function countByStage(tasks) {
+      const counts = {};
+      STAGES.forEach(s => counts[s] = 0);
+      tasks.forEach(t => {
+        if (t.stage in counts) counts[t.stage]++;
+      });
+      return counts;
+    }
+
+    function deltaHtml(n, cls = "") {
+      if (n > 0) return `<span class="delta-up ${cls}">▲ ${n}</span>`;
+      if (n < 0) return `<span class="delta-down ${cls}">▼ ${Math.abs(n)}</span>`;
+      return `<span class="delta-flat ${cls}">—</span>`;
+    }
+
+    async function load() {
+      const [tasks, history] = await Promise.all([
+        fetch('stages.json?_=' + Date.now()).then(r => r.json()).catch(() => []),
+        fetch('history.json?_=' + Date.now()).then(r => r.json()).catch(() => [])
+      ]);
+
+      const current = countByStage(tasks);
+      const prev = history.length >= 2 ? history[history.length - 2].stages : {};
+
+      const lastEntry = history[history.length - 1];
+      document.getElementById('updated').textContent = lastEntry
+        ? 'Last updated: ' + new Date(lastEntry.timestamp).toLocaleString()
+        : 'No run data yet';
+
+      const total = tasks.length;
+      const prevTotal = Object.values(prev).reduce((a, b) => a + b, 0);
+      const active = STAGES.filter(s => IN_PROGRESS_STAGES.has(s)).reduce((a, s) => a + (current[s] || 0), 0);
+      const prevActive = STAGES.filter(s => IN_PROGRESS_STAGES.has(s)).reduce((a, s) => a + (prev[s] || 0), 0);
+      const delivered = current["Delivered"] || 0;
+      const prevDelivered = prev["Delivered"] || 0;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-total-delta').innerHTML = deltaHtml(total - prevTotal);
+      document.getElementById('stat-active').textContent = active;
+      document.getElementById('stat-active-delta').innerHTML = deltaHtml(active - prevActive);
+      document.getElementById('stat-delivered').textContent = delivered;
+      document.getElementById('stat-delivered-delta').innerHTML = deltaHtml(delivered - prevDelivered);
+
+      const colors = STAGES.map(s => s === "Delivered" ? "#34d399" : s === "Attempt" ? "#f87171" : "#6366f1");
+
+      new Chart(document.getElementById('chart'), {
+        type: 'bar',
+        data: {
+          labels: STAGES,
+          datasets: [{
+            data: STAGES.map(s => current[s] || 0),
+            backgroundColor: colors,
+            borderRadius: 4,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: ctx => ` ${ctx.raw} tasks`
+          }}},
+          scales: {
+            x: { ticks: { color: '#475569', font: { size: 11 } }, grid: { color: '#1e2433' } },
+            y: { ticks: { color: '#cbd5e1', font: { size: 11 } }, grid: { display: false } }
+          }
+        }
+      });
+
+      const tbody = document.getElementById('tbody');
+      let runTotal = 0;
+      STAGES.forEach((stage, i) => {
+        const count = current[stage] || 0;
+        const delta = count - (prev[stage] || 0);
+        runTotal += count;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="color:#475569">${i + 1}</td>
+          <td>${stage}</td>
+          <td class="num">${count}</td>
+          <td class="num">${deltaHtml(delta)}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      const totalRow = document.createElement('tr');
+      totalRow.className = 'row-total';
+      totalRow.innerHTML = `<td colspan="2">Total</td><td class="num">${runTotal}</td><td></td>`;
+      tbody.appendChild(totalRow);
+    }
+
+    load();
+  </script>
+</body>
+</html>
