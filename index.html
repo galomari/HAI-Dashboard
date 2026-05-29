@@ -7,23 +7,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0f1117; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; padding: 2rem; min-height: 100vh; }
-    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+    body { background: #0f1117; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; padding: 2rem; }
+    header { margin-bottom: 2rem; }
     h1 { font-size: 1.6rem; font-weight: 700; }
     .subtitle { color: #64748b; font-size: 0.85rem; margin-top: 0.25rem; }
-    .load-btn { background: #6366f1; color: #fff; border: none; border-radius: 8px; padding: 0.6rem 1.2rem; font-size: 0.875rem; cursor: pointer; font-weight: 600; transition: background 0.15s; }
-    .load-btn:hover { background: #4f46e5; }
-    #file-input { display: none; }
-    .empty { text-align: center; padding: 5rem 2rem; color: #475569; }
-    .empty h2 { font-size: 1.2rem; margin-bottom: 0.5rem; color: #64748b; }
-    .empty p { font-size: 0.9rem; line-height: 1.6; }
-    .empty code { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.85rem; color: #a5b4fc; }
-    #dashboard { display: none; }
-    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
-    .stat { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 1rem 1.25rem; }
-    .stat-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
-    .stat-value { font-size: 1.75rem; font-weight: 700; margin-top: 0.2rem; }
-    .stat-delta { font-size: 0.8rem; margin-top: 0.15rem; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
     .card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 12px; padding: 1.5rem; }
     .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 1.25rem; }
@@ -36,67 +23,56 @@
     .delta-down { color: #f87171; font-weight: 600; }
     .delta-flat { color: #334155; }
     .row-total td { border-top: 1px solid #2d3748; border-bottom: none; font-weight: 700; color: #94a3b8; padding-top: 0.75rem; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 1rem 1.25rem; }
+    .stat-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; margin-top: 0.2rem; }
+    .stat-delta { font-size: 0.8rem; margin-top: 0.15rem; }
     @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
 <body>
   <header>
-    <div>
-      <h1>HAI Task Dashboard</h1>
-      <p class="subtitle" id="updated">Load your stages.json to see results</p>
-    </div>
-    <div>
-      <button class="load-btn" onclick="document.getElementById('file-input').click()">Load stages.json</button>
-      <input type="file" id="file-input" accept=".json" onchange="handleFile(event)">
-    </div>
+    <h1>HAI Task Dashboard</h1>
+    <p class="subtitle" id="updated">Loading...</p>
   </header>
 
-  <div class="empty" id="empty-state">
-    <h2>No data loaded</h2>
-    <p>
-      Run <code>node main.js</code> in HAI-Script to generate <code>stages.json</code>,<br>
-      then click <strong>Load stages.json</strong> above.
-    </p>
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="stat-label">Total Tasks</div>
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-delta" id="stat-total-delta"></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">In Progress</div>
+      <div class="stat-value" id="stat-active">—</div>
+      <div class="stat-delta" id="stat-active-delta"></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Delivered</div>
+      <div class="stat-value" id="stat-delivered">—</div>
+      <div class="stat-delta" id="stat-delivered-delta"></div>
+    </div>
   </div>
 
-  <div id="dashboard">
-    <div class="stat-grid">
-      <div class="stat">
-        <div class="stat-label">Total Tasks</div>
-        <div class="stat-value" id="stat-total">—</div>
-        <div class="stat-delta" id="stat-total-delta"></div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">In Progress</div>
-        <div class="stat-value" id="stat-active">—</div>
-        <div class="stat-delta" id="stat-active-delta"></div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Delivered</div>
-        <div class="stat-value" id="stat-delivered">—</div>
-        <div class="stat-delta" id="stat-delivered-delta"></div>
-      </div>
+  <div class="grid">
+    <div class="card">
+      <h2>Tasks by Stage</h2>
+      <canvas id="chart"></canvas>
     </div>
-
-    <div class="grid">
-      <div class="card">
-        <h2>Tasks by Stage</h2>
-        <canvas id="chart"></canvas>
-      </div>
-      <div class="card">
-        <h2>Stage Breakdown</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Stage</th>
-              <th class="num">Count</th>
-              <th class="num">Change</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
+    <div class="card">
+      <h2>Stage Breakdown</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Stage</th>
+            <th class="num">Count</th>
+            <th class="num">Change</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -107,9 +83,6 @@
       "Internal Audit", "Ready to Deliver", "Delivered"
     ];
     const IN_PROGRESS = new Set(STAGES.filter(s => s !== "Delivered"));
-    const HISTORY_KEY = "hai_dashboard_history";
-
-    let chartInstance = null;
 
     function countByStage(tasks) {
       const counts = {};
@@ -124,26 +97,19 @@
       return `<span class="delta-flat">—</span>`;
     }
 
-    function loadHistory() {
-      try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; }
-    }
+    async function load() {
+      const [tasks, history] = await Promise.all([
+        fetch('stages.json?_=' + Date.now()).then(r => r.json()).catch(() => []),
+        fetch('history.json?_=' + Date.now()).then(r => r.json()).catch(() => [])
+      ]);
 
-    function saveHistory(history) {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(-200)));
-    }
-
-    function render(tasks) {
       const current = countByStage(tasks);
-      const history = loadHistory();
-      const prev = history.length > 0 ? history[history.length - 1].stages : {};
+      const prev = history.length >= 2 ? history[history.length - 2].stages : {};
 
-      // Save this run to history
-      history.push({ timestamp: new Date().toISOString(), stages: current });
-      saveHistory(history);
-
-      document.getElementById('updated').textContent = 'Last updated: ' + new Date().toLocaleString();
-      document.getElementById('empty-state').style.display = 'none';
-      document.getElementById('dashboard').style.display = 'block';
+      const lastEntry = history[history.length - 1];
+      document.getElementById('updated').textContent = lastEntry
+        ? 'Last updated: ' + new Date(lastEntry.timestamp).toLocaleString()
+        : 'No data yet';
 
       const total = tasks.length;
       const prevTotal = Object.values(prev).reduce((a, b) => a + b, 0);
@@ -162,8 +128,7 @@
       const activeStages = STAGES.filter(s => (current[s] || 0) > 0);
       const colors = activeStages.map(s => s === "Delivered" ? "#34d399" : s === "Attempt" ? "#f87171" : "#6366f1");
 
-      if (chartInstance) chartInstance.destroy();
-      chartInstance = new Chart(document.getElementById('chart'), {
+      new Chart(document.getElementById('chart'), {
         type: 'bar',
         data: {
           labels: activeStages,
@@ -202,21 +167,7 @@
       tbody.appendChild(totalRow);
     }
 
-    function handleFile(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const tasks = JSON.parse(e.target.result);
-          render(tasks);
-        } catch {
-          alert('Invalid JSON file. Make sure you selected the stages.json from HAI-Script.');
-        }
-      };
-      reader.readAsText(file);
-      event.target.value = '';
-    }
+    load();
   </script>
 </body>
 </html>
